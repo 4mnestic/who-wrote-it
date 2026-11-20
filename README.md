@@ -20,6 +20,21 @@ better, and used it on the disputed Federalist Papers.
 
 ![Accuracy by passage length](figures/accuracy_by_passage_length.png)
 
+## Skills and tools
+
+| Skill | How it's used here | See it |
+|---|---|---|
+| Leakage-free evaluation | Train on 11 books, test on the 12th; no model is scored on a book it saw | [`leave_one_book_out`](wld/classify.py#L26) |
+| Significance vs. effect size | Chi-square plus Cramér's V shows a "significant" difference is tiny | [`homogeneity_test`](wld/stats.py#L9), [table](METHODS.md#word-length-significant-but-tiny) |
+| Class imbalance | Balanced class weights and balanced accuracy (Hamilton wrote 51 of 65 known papers) | [`make_model`](wld/classify.py#L15), [scoring](wld/classify.py#L53) |
+| Feature engineering | Two feature sets behind one interface; vectorized per-passage rates in NumPy | [`features.py`](wld/features.py#L48) |
+| Data cleaning | Narrative boundaries recorded in a manifest; prefaces, captions and headings removed in code | [`clean`](wld/corpus.py#L47), [`books.csv`](data/books.csv) |
+| Probabilistic prediction | P(Madison) for each disputed paper, after leave-one-paper-out validation | [`predict_documents`](wld/classify.py#L87), [validation](wld/classify.py#L66) |
+| Data visualization | Direct labels, the baseline greyed out, a colorblind-safe palette | [`fig_accuracy`](wld/analysis.py#L81) |
+| Reproducibility | One command rebuilds every table and chart; locked dependencies; tests run in CI | [`main`](wld/analysis.py#L149), [`tests/`](tests/), [CI](.github/workflows/ci.yml) |
+
+**Tools:** Python, NumPy, pandas, SciPy, scikit-learn, matplotlib, pytest, uv, GitHub Actions.
+
 ## The Federalist Papers
 
 Hamilton and Madison both claimed authorship of 12 of these 1787–88 essays. Their word
