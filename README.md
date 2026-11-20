@@ -9,31 +9,21 @@ better, and used it on the disputed Federalist Papers.
 ## Results
 
 - **Word length doesn't identify authors.** On 1,000-word passages it picks the right author
-  50% of the time, against 33% for a random guess. The differences between authors are
-  statistically significant but no bigger than the differences among one author's own books.
-- **Function words do.** Using how often a writer uses 70 common words (*the, upon,
-  would, whilst*…), accuracy is 90% at 1,000 words and 99% at 5,000. All 12 novels are
-  attributed correctly.
-- **The Federalist Papers.** After correctly attributing 64 of 65 papers of known
-  authorship, the model gives 11 of the 12 disputed papers to Madison with at least 93%
-  confidence, matching the historical consensus. No. 55 is too close to call.
+  50% of the time, against 33% for a random guess. A [chi-square test](wld/stats.py#L9)
+  (SciPy) calls the differences between authors significant, but the effect size (Cramér's
+  V = 0.04) is [no bigger](METHODS.md#word-length-significant-but-tiny) than the
+  differences among one author's own books. With millions of words, "significant" doesn't
+  mean "useful."
+- **Function words do.** I [engineered features](wld/features.py#L48) from how often a
+  writer uses 70 common words (*the, upon, would, whilst*…) and fed them to a scikit-learn
+  [logistic regression](wld/classify.py#L15). Accuracy is 90% at 1,000 words and 99% at
+  5,000. All 12 novels are attributed correctly.
+- **The Federalist Papers.** After correctly attributing 64 of 65 papers of known authorship,
+  the model [assigns probabilities](wld/classify.py#L87) to the 12 disputed papers: 11 go to
+  Madison with at least 93% confidence, matching the historical consensus. No. 55 is too
+  close to call.
 
 ![Accuracy by passage length](figures/accuracy_by_passage_length.png)
-
-## Skills and tools
-
-| Skill | How it's used here | See it |
-|---|---|---|
-| Leakage-free evaluation | Train on 11 books, test on the 12th; no model is scored on a book it saw | [`leave_one_book_out`](wld/classify.py#L26) |
-| Significance vs. effect size | Chi-square plus Cramér's V shows a "significant" difference is tiny | [`homogeneity_test`](wld/stats.py#L9), [table](METHODS.md#word-length-significant-but-tiny) |
-| Class imbalance | Balanced class weights and balanced accuracy (Hamilton wrote 51 of 65 known papers) | [`make_model`](wld/classify.py#L15), [scoring](wld/classify.py#L53) |
-| Feature engineering | Two feature sets behind one interface; vectorized per-passage rates in NumPy | [`features.py`](wld/features.py#L48) |
-| Data cleaning | Narrative boundaries recorded in a manifest; prefaces, captions and headings removed in code | [`clean`](wld/corpus.py#L47), [`books.csv`](data/books.csv) |
-| Probabilistic prediction | P(Madison) for each disputed paper, after leave-one-paper-out validation | [`predict_documents`](wld/classify.py#L87), [validation](wld/classify.py#L66) |
-| Data visualization | Direct labels, the baseline greyed out, a colorblind-safe palette | [`fig_accuracy`](wld/analysis.py#L81) |
-| Reproducibility | One command rebuilds every table and chart; locked dependencies; tests run in CI | [`main`](wld/analysis.py#L149), [`tests/`](tests/), [CI](.github/workflows/ci.yml) |
-
-**Tools:** Python, NumPy, pandas, SciPy, scikit-learn, matplotlib, pytest, uv, GitHub Actions.
 
 ## The Federalist Papers
 
@@ -48,12 +38,20 @@ The clearest single clue is *upon*. Hamilton uses it 3.3 times per 1,000 words, 
 
 ## How it was tested
 
-- **No peeking:** each model is scored only on books (or papers) it never saw in training.
-- **Fair scoring:** accuracy is balanced across authors, so a model can't score well by
-  always guessing the most prolific one.
-- **Clean text:** prefaces, contents pages and chapter headings are stripped in code.
+- **No data leakage.** Every score comes from text the model never saw. For the novels,
+  I [train on 11 books and test on the 12th](wld/classify.py#L26), rotating through all 12;
+  for the Federalist Papers, I [hold out one paper at a time](wld/classify.py#L66).
+  Splitting randomly would let the model recognize a book's characters instead of its
+  author's style.
+- **Class imbalance handled.** Hamilton wrote 51 of the 65 known papers, so always guessing
+  "Hamilton" would be right 78% of the time. Classes are weighted equally and scored with
+  [balanced accuracy](wld/classify.py#L53), which that trick can't fool.
+- **Cleaning done in code, not by hand.** A [manifest](data/books.csv) records where each
+  narrative starts and ends; [`clean`](wld/corpus.py#L47) removes editors' prefaces,
+  illustration captions and chapter headings with regular expressions, and NumPy turns the
+  text into features.
 
-Full tables and test details are in [METHODS.md](METHODS.md).
+Full tables are in [METHODS.md](METHODS.md).
 
 ## Limitations
 
@@ -64,13 +62,15 @@ Full tables and test details are in [METHODS.md](METHODS.md).
 
 ## Reproduce
 
+One command rebuilds every table (pandas) and chart (matplotlib) from the raw texts.
+Dependencies are locked with uv, and the [pytest suite](tests/) runs on every push via
+GitHub Actions.
+
 ```bash
 uv sync
 uv run python -m wld.analysis   # rewrites results/ and figures/
 uv run pytest
 ```
-
-Code is in `wld/`; every number above comes from a file in `results/`.
 
 ## Background
 
