@@ -1,161 +1,116 @@
-# Do authors have a word-length fingerprint?
+# Who wrote it? Identifying authors from their writing habits
 
 [![tests](https://github.com/4mnestic/word-length-distribution-goodness-of-fit/actions/workflows/ci.yml/badge.svg)](https://github.com/4mnestic/word-length-distribution-goodness-of-fit/actions/workflows/ci.yml)
 
-In 1887 the physicist T. C. Mendenhall suggested that every writer has a characteristic
-"curve" of word lengths: how often they use 1-letter words, 2-letter words, and so on.
-He believed the curve could be used to identify who wrote a text. He compared the
-curves by eye but never tested the idea statistically.
+In 1887, T. C. Mendenhall proposed that every writer has a telltale pattern of word lengths
+that could reveal who wrote a text. I tested that idea on 2.4 million words of fiction,
+found a signal that works far better, and applied it to the best-known authorship dispute
+in American history.
 
-This project tests it on **12 novels by Jane Austen, Charles Dickens and Leo Tolstoy**
-(2.4 million words in total).
+## Highlights
 
-## The short answer
+- **Showed the 1887 idea doesn't hold up.** From a 1,000-word passage, word length names the
+  right author only **50%** of the time, against 33% for a random guess.
+- **Found a signal that does work: 90% accuracy** on the same passages, using how often a
+  writer uses 70 common "function words" (*the, upon, would, whilst*…). It reaches **99%** at
+  5,000 words and attributes all 12 novels correctly. Every score comes from books the
+  model never saw during training.
+- **Settled a real dispute.** Hamilton and Madison both claimed 12 of the Federalist Papers.
+  The model, first validated on 64 of 65 papers of known authorship, assigns **11 of the 12
+  to Madison with at least 93% confidence**, matching the historical consensus. It flags the
+  twelfth, No. 55, as too close to call.
+- **Avoided the traps that make results look better than they are:** no test book is ever
+  seen in training, effect sizes are reported alongside p-values, results are checked against
+  shuffled labels, and a confounder (the translator) is tested directly.
 
-- **Authors do differ, but only slightly.** Their word-length curves almost overlap, and
-  the differences between authors are about as large as the differences between two books
-  by the same author.
-- **The differences are real, not noise.** Of the 5,775 possible ways to split the
-  12 books into three groups of four, grouping them by their real author separates
-  them best (p ≈ 0.0002).
-- **They are too weak to be a fingerprint.** Shown a 1,000-word passage from a book it has
-  never seen, a model that knows only word lengths names the right author 50% of the time.
-  Random guessing would score 33%. With 10,000 words it reaches 73%. Mendenhall's signal
-  exists, but it is not a reliable way to identify a writer.
+![Accuracy by passage length](figures/accuracy_by_passage_length.png)
 
-## The data
+## Recommendation
 
-Twelve public-domain novels from Project Gutenberg, four per author
-([`data/books.csv`](data/books.csv)). For each book the code keeps only the story
-itself, using a start and end phrase recorded in that file. It removes the editor's
-prefaces, contents pages, illustration captions and chapter headings. A **word** is a run
-of letters, and its length is its number of letters. Punctuation and numbers don't count,
-and apostrophes don't add to the length (*don't* has 4 letters).
+If you need to attribute an unsigned text:
 
-> **Caveat:** Tolstoy wrote in Russian. These are English translations by Constance Garnett
-> (*Anna Karenina*) and Louise and Aylmer Maude (the other three). The *War and Peace* file
-> doesn't name its translator; its text matches the Maude translation. So the
-> "Tolstoy" results describe his translators' English as much as Tolstoy himself.
+1. **Use function-word frequencies, not word length.** Word length barely beats a guess
+   (see chart above).
+2. **Set a minimum input length.** Expect about 85% accuracy at 500 words, 90% at 1,000 and
+   97% at 2,500. Below about 500 words, treat the result as a hint.
+3. **Report a probability, not just a name, and send close calls to a human.** The model's
+   only miss on known Federalist papers was the shortest one (No. 13, 960 words), and it was
+   a near coin-flip (52% vs. 48%).
+4. **Check who else touched the text.** For translated novels the translator leaves a
+   fingerprint too (see [limitations](#limitations)).
 
-## Results
+## The Federalist Papers
 
-### 1. The curves nearly overlap
+In 1787–88 Hamilton, Madison and Jay published 85 essays under one pen name. Twelve were later
+claimed by both Hamilton and Madison. Their word lengths are nearly identical, so the 1887
+method can't separate them: it gets 65% on known papers, and its verdicts on the disputed
+papers scatter (grey dots). Function words separate them cleanly (blue dots):
 
-![Word-length distribution by author](figures/word_length_by_author.png)
+![Disputed Federalist Papers](figures/federalist_disputed.png)
 
-All three authors use 3-letter words most often (*the, and, was*). The visible differences
-are small. The Tolstoy translations use slightly more 3-letter words (25.8% vs. 23.5%) and
-fewer 1-letter words (2.7% vs. 3.5–4.1%). Austen uses slightly more 2-letter and 9-letter
-words. ([`results/author_distributions.csv`](results/author_distributions.csv))
+The clearest single clue is the word *upon*. Hamilton uses it 3.3 times per 1,000 words.
+Madison uses it 0.18 times, and the disputed papers 0.13 times.
 
-### 2. "Statistically significant" is not the same as "large"
+![Use of "upon"](figures/federalist_upon.png)
 
-A chi-square test asks whether groups share the same distribution. With millions of words,
-it flags even tiny differences, so every comparison below is overwhelmingly "significant."
-The useful number is **Cramér's V**, which measures how big the difference is on a 0–1
-scale (0 means identical distributions).
+No. 55 was also among the weakest cases in Mosteller and Wallace's landmark 1964 study of
+these papers.
 
-| Comparison | Words | Chi-square (df) | p | Cramér's V |
-|---|---:|---:|---:|---:|
-| Between the three authors | 2,401,328 | 8,055 (24) | < 10⁻³⁰⁰ | **0.041** |
-| Among Austen's four books | 486,467 | 878 (36) | 5 × 10⁻¹⁶¹ | 0.025 |
-| Among Dickens's four books | 805,873 | 3,942 (36) | < 10⁻³⁰⁰ | 0.040 |
-| Among Tolstoy's four books | 1,108,988 | 3,404 (36) | < 10⁻³⁰⁰ | 0.032 |
+## How it works
 
-([`results/chi_square_tests.csv`](results/chi_square_tests.csv). Every expected cell count
-is at least 73, so the test's assumptions hold.)
+- **Data:** 12 novels by Austen, Dickens and Tolstoy (4 each), all 85 Federalist Papers, and
+  4 Dostoevsky novels for a translator check. All are public domain, from Project Gutenberg.
+  Prefaces, contents pages and chapter headings are stripped in code.
+- **Features:** each passage becomes a short list of rates: either the share of words of
+  each length, or how often each of the 70 function words appears.
+- **Model:** logistic regression. It is deliberately simple, so the comparison is about the
+  signal rather than the model.
+- **Evaluation:** for the novels, train on 11 books and test on the 12th, rotating through
+  all 12. For the Federalist Papers, hold out one known paper at a time.
+- **Scoring:** accuracy is *balanced* accuracy, the average of each author's hit rate. A model
+  can't score well just by always guessing the author with the most text (Hamilton wrote
+  51 of the 65 known papers).
 
-The difference *between* authors (V = 0.041) is about the same as the difference among
-Dickens's own novels (V = 0.040). The chart below shows the same thing with a simpler
-number, each book's average word length:
-
-![Mean word length by book](figures/mean_length_by_book.png)
-
-*Great Expectations* (4.08 letters) and *Nicholas Nickleby* (4.38) are both Dickens, yet
-they are further apart than most books by different authors.
-([`results/books.csv`](results/books.csv))
-
-### 3. But the author signal is real
-
-The chi-square test treats every word as an independent observation. Words aren't
-independent: a book's subject, narrator and era affect all of its words together. So the
-fair unit of evidence is the **book**, and with 12 books the evidence is limited.
-
-An **exact permutation test** respects that. It measures how well the author grouping
-separates the books' word-length profiles (a PERMANOVA pseudo-F on Hellinger-transformed
-proportions). It then compares that against **every** other way of splitting the 12 books
-into three groups of four, all 34,650 labelings. The real grouping is the most separated
-of them all: pseudo-F = 4.04, p = 6/34,650 ≈ 0.00017, the smallest p-value this test can
-produce. ([`results/summary.json`](results/summary.json))
-
-### 4. Can word lengths identify the author of a new passage?
-
-This is the question Mendenhall actually cared about. Each book is cut into passages of
-equal length, and each passage is described by its 13 word-length proportions. A logistic
-regression is trained on 11 books and tested on the 12th, rotating through all 12. The
-model is never tested on a book it saw during training, so it can't succeed by recognizing
-a familiar book.
-
-![Classifier accuracy by passage length](figures/classifier_accuracy.png)
-
-| Passage length | 100 | 250 | 500 | 1,000 | 2,500 | 5,000 | 10,000 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Balanced accuracy | 42% | 44% | 47% | 50% | 57% | 62% | 73% |
-
-([`results/classification_by_chunk_size.csv`](results/classification_by_chunk_size.csv))
-
-Is 50% really better than chance? To check, the author labels were shuffled between whole
-books 200 times and the model was retrained on each shuffle. On shuffled labels it scored a
-median of 31%, and 95% of runs scored at most 43%. The real 50% beat all but one shuffle
-(p ≈ 0.01), so the signal is genuine, just weak.
-
-When each held-out book is labeled by a majority vote of its 1,000-word passages, 10 of 12
-books get the right author. The two misses are *Great Expectations* (labeled Austen) and
-*War and Peace* (labeled Dickens).
-([`results/classification_per_book_1000.csv`](results/classification_per_book_1000.csv),
-[`results/confusion_matrix_1000.csv`](results/confusion_matrix_1000.csv))
+The full statistics are in [METHODS.md](METHODS.md): significance tests and effect sizes, the
+shuffled-label checks, per-book results and the translator experiment.
 
 ## Limitations
 
-- **Three authors, twelve books.** Book-level conclusions rest on 12 data points.
-- **Translation.** The "Tolstoy" books measure Garnett's and the Maudes' English (see above).
-- **Genre and era are mixed in with author.** All three are 19th-century novelists, but
-  differences in subject matter (Tolstoy's war scenes, Dickens's dialect) can drive word
-  length as much as personal style.
-- **Word length is a single, coarse feature.** Modern authorship attribution relies on
-  function-word frequencies and character n-grams, which carry far more signal.
+- **Small number of authors.** Three novelists, and a two-author choice for the Federalist
+  Papers. Picking among many candidate authors is harder.
+- **Translation is a confounder.** The Tolstoy novels are English translations. The model
+  was trained on Tolstoy translated by the Maudes against Dostoevsky translated by Constance
+  Garnett. It then assigned 71% of the passages of *Anna Karenina* (Tolstoy, translated by
+  Garnett) to Dostoevsky, so part of the "author" signal is the translator.
+- **Era and genre are held roughly constant.** All texts are 18th–19th-century English
+  prose. A modern or mixed-genre setting would need re-validation.
 
-## Reproduce it
+## Reproduce
 
-Requires [uv](https://docs.astral.sh/uv/) (it installs Python and the locked dependencies).
+Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
-uv run python -m wld.analysis   # ~1 minute; writes results/ and figures/
-uv run pytest                   # unit tests with coverage report
+uv run python -m wld.analysis   # ~1 minute; rewrites results/ and figures/
+uv run pytest                   # tests
 ```
 
-Everything is deterministic (fixed random seed), so the outputs should match the committed
-files exactly.
+The pipeline is deterministic, so every number above can be traced to a file in
+[`results/`](results/).
 
-## Repository layout
-
-```
-data/books.csv          manifest: author, translator, start/end markers per book
-data/texts/             the 12 Project Gutenberg texts
-wld/corpus.py           cleaning, tokenizing, word-length bins
-wld/stats.py            chi-square + Cramér's V, exact permutation test
-wld/classify.py         passage features, leave-one-book-out classifier
-wld/analysis.py         runs everything, writes results/ and figures/
-tests/                  unit and end-to-end tests (100% line coverage)
-```
+| Path | Contents |
+|---|---|
+| `data/` | Texts and a manifest (author, translator, where each text starts and ends) |
+| `wld/` | Cleaning (`corpus.py`), features (`features.py`), models (`classify.py`), statistics (`stats.py`), pipeline (`analysis.py`) |
+| `results/`, `figures/` | Every table and chart, as generated |
 
 ## Background
 
 This project began as a term paper for LING 388, which I later extended with
 [Claude](https://claude.ai).
 
-## Reference
+## References
 
-Mendenhall, T. C. (1887). The characteristic curves of composition. *Science*, 9(214),
-237–249. <https://www.jstor.org/stable/1764604>
+- Mendenhall, T. C. (1887). The characteristic curves of composition. *Science*, 9(214), 237–249.
+- Mosteller, F., & Wallace, D. L. (1964). *Inference and Disputed Authorship: The Federalist*.
+  Addison-Wesley.

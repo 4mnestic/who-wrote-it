@@ -1,4 +1,4 @@
-"""Can a passage's word-length distribution identify its author?"""
+"""Author classifiers, always evaluated on texts the model never saw."""
 
 from __future__ import annotations
 
@@ -8,36 +8,33 @@ from sklearn.metrics import balanced_accuracy_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from .corpus import Book, bin_counts
+from .corpus import Book
+from .features import FeatureSet, chunk_rates, rates
 
 
-def chunk_features(lengths: np.ndarray, chunk_size: int) -> np.ndarray:
-    """Split a book into consecutive non-overlapping chunks of `chunk_size`
-    words (the remainder is dropped); return each chunk's bin proportions."""
-    n = len(lengths) // chunk_size
-    if n == 0:
-        return np.empty((0, len(bin_counts(lengths[:0]))))
-    rows = [bin_counts(c) for c in lengths[: n * chunk_size].reshape(n, chunk_size)]
-    return np.array(rows, dtype=float) / chunk_size
+def make_model():
+    """Standardized multinomial logistic regression, classes weighted equally."""
+    return make_pipeline(
+        StandardScaler(), LogisticRegression(max_iter=5000, class_weight="balanced")
+    )
 
 
-def leave_one_book_out(books: list[Book], chunk_size: int) -> dict:
-    """Train on chunks from all books but one, predict the held-out book's
-    chunks, repeat for every book. Holding out whole books keeps chunks of
-    the test book out of training, so the model must generalize to new books
-    rather than recognize a book it has already seen."""
-    feats = [chunk_features(b.lengths, chunk_size) for b in books]
+def _chunks(books: list[Book], fs: FeatureSet, chunk_size: int) -> list[np.ndarray]:
+    return [chunk_rates(fs.encode(b.words), fs.n_features, chunk_size) for b in books]
+
+
+def leave_one_book_out(books: list[Book], chunk_size: int, fs: FeatureSet) -> dict:
+    """Train on chunks from every book but one, predict the held-out book's
+    chunks, and repeat for every book. Holding out whole books means the model
+    must generalize to a new book, not recognize one it has already seen."""
+    feats = _chunks(books, fs, chunk_size)
     y_true, y_pred, per_book = [], [], []
     for i, book in enumerate(books):
         x_train = np.vstack([f for j, f in enumerate(feats) if j != i])
         y_train = np.concatenate(
             [[b.author] * len(f) for j, (b, f) in enumerate(zip(books, feats)) if j != i]
         )
-        model = make_pipeline(
-            StandardScaler(),
-            LogisticRegression(max_iter=5000, class_weight="balanced"),
-        ).fit(x_train, y_train)
-        pred = model.predict(feats[i])
+        pred = make_model().fit(x_train, y_train).predict(feats[i])
         y_true += [book.author] * len(pred)
         y_pred += list(pred)
         values, counts = np.unique(pred, return_counts=True)
@@ -51,11 +48,64 @@ def leave_one_book_out(books: list[Book], chunk_size: int) -> dict:
             }
         )
     return {
+        "features": fs.name,
         "chunk_size": chunk_size,
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
-        "chance": 1 / len({b.author for b in books}),
         "books_correct_by_vote": sum(r["majority_vote"] == r["author"] for r in per_book),
         "per_book": per_book,
         "y_true": y_true,
         "y_pred": y_pred,
     }
+
+
+def train_test_books(
+    train: list[Book], test: list[Book], chunk_size: int, fs: FeatureSet,
+    label=lambda b: b.author,
+) -> list[dict]:
+    """Fit on `train` chunks (labeled by `label`) and report, for each test
+    book, the share of its chunks assigned to each class."""
+    feats = _chunks(train, fs, chunk_size)
+    y = np.concatenate([[label(b)] * len(f) for b, f in zip(train, feats)])
+    model = make_model().fit(np.vstack(feats), y)
+    out = []
+    for book, f in zip(test, _chunks(test, fs, chunk_size)):
+        pred = model.predict(f)
+        out.append(
+            {"title": book.title, "features": fs.name, "chunks": len(pred)}
+            | {c: float(np.mean(pred == c)) for c in model.classes_}
+        )
+    return out
+
+
+def paper_level(papers: list[Book], fs: FeatureSet) -> np.ndarray:
+    """One row of feature rates per whole document."""
+    return np.array([rates(fs.encode(p.words), fs.n_features) for p in papers])
+
+
+def leave_one_out_documents(known: list[Book], fs: FeatureSet) -> dict:
+    """Leave-one-document-out accuracy on documents of known authorship."""
+    x, y = paper_level(known, fs), np.array([p.author for p in known])
+    pred, per_document = [], []
+    for i, doc in enumerate(known):
+        model = make_model().fit(np.delete(x, i, 0), np.delete(y, i))
+        proba = model.predict_proba(x[i : i + 1])[0]
+        pred.append(model.classes_[np.argmax(proba)])
+        per_document.append({"title": doc.title, "author": doc.author, "predicted": pred[-1]}
+                            | {f"p_{c.lower()}": float(p) for c, p in zip(model.classes_, proba)})
+    pred = np.array(pred)
+    return {
+        "per_document": per_document,
+        "features": fs.name,
+        "balanced_accuracy": float(balanced_accuracy_score(y, pred)),
+        "correct": int(np.sum(pred == y)),
+        "n": len(y),
+        "misclassified": "; ".join(p.title for p, ok in zip(known, pred == y) if not ok),
+    }
+
+
+def predict_documents(known: list[Book], unknown: list[Book], fs: FeatureSet,
+                      positive: str) -> np.ndarray:
+    """Train on all known documents; return P(`positive`) for each unknown one."""
+    model = make_model().fit(paper_level(known, fs), [p.author for p in known])
+    col = list(model.classes_).index(positive)
+    return model.predict_proba(paper_level(unknown, fs))[:, col]

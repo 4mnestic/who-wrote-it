@@ -1,7 +1,16 @@
 import numpy as np
 import pytest
 
-from wld.corpus import bin_counts, bin_labels, clean, load_books, word_lengths
+from wld.corpus import (
+    Book,
+    bin_counts,
+    bin_labels,
+    clean,
+    federalist_author,
+    load_books,
+    load_federalist,
+    tokenize,
+)
 
 RAW = """PREFACE by an editor, who is not the author.
 
@@ -31,14 +40,15 @@ def test_clean_raises_when_markers_missing():
         clean(RAW, "not in the text", "it ended there.")
 
 
-def test_word_lengths_ignore_punctuation_and_digits():
-    """Punctuation and numbers are not words, so ',' is never a 1-letter word."""
-    assert word_lengths("Hello, world! 1887 -- ok.").tolist() == [5, 5, 2]
+def test_tokenize_lowercases_and_drops_punctuation_and_digits():
+    """Words are lowercased; punctuation and numbers are not words."""
+    assert tokenize("Hello, World! 1887 -- ok.").tolist() == ["hello", "world", "ok"]
 
 
-def test_word_lengths_contractions_and_accents():
-    """Internal apostrophes join a word but are not counted; accented letters are letters."""
-    assert word_lengths("don’t o'clock café Oblonskys’ house").tolist() == [4, 6, 4, 9, 5]
+def test_lengths_ignore_apostrophes_and_count_accents():
+    """Internal apostrophes join a word but are not counted; accented letters count."""
+    words = tokenize("don’t o'clock café Oblonskys’ house")
+    assert Book("t", "a", "", words).lengths.tolist() == [4, 6, 4, 9, 5]
 
 
 def test_bin_counts_are_aligned_by_length():
@@ -59,14 +69,37 @@ def test_bin_labels_match_bins():
     assert len(bin_labels()) == len(bin_counts(np.array([1])))
 
 
-def test_load_books_reads_manifest(tmp_path):
-    """Books are loaded from the manifest, cleaned and tokenized."""
+def test_load_books_filters_by_set(tmp_path):
+    """Only manifest rows in the requested set are loaded, cleaned and tokenized."""
     (tmp_path / "texts").mkdir()
     (tmp_path / "texts" / "a.txt").write_text("junk Start of tale. The End junk")
+    (tmp_path / "texts" / "b.txt").write_text("Start x The End")
     (tmp_path / "books.csv").write_text(
-        "file,title,author,translator,published,start,end\n"
-        "a.txt,Tale,Someone,,1900,Start,The End\n"
+        "file,title,author,translator,published,set,start,end\n"
+        "a.txt,Tale,Someone,,1900,main,Start,The End\n"
+        "b.txt,Other,Else,,1900,translation,Start,The End\n"
     )
-    (book,) = load_books(tmp_path)
+    (book,) = load_books("main", tmp_path)
     assert (book.title, book.author) == ("Tale", "Someone")
-    assert book.lengths.tolist() == [5, 2, 4, 3, 3]
+    assert book.words.tolist() == ["start", "of", "tale", "the", "end"]
+
+
+def test_federalist_author_follows_scholarly_attribution():
+    """Disputed, Jay, joint and Madison papers are labeled; the rest are Hamilton."""
+    assert [federalist_author(n) for n in (1, 2, 10, 18, 49, 62, 85)] == [
+        "Hamilton", "Jay", "Madison", "Joint", "Disputed", "Disputed", "Hamilton"]
+
+
+def test_load_federalist_keeps_only_paper_bodies(tmp_path):
+    """Each paper keeps the text between the salutation and PUBLIUS."""
+    path = tmp_path / "fed.txt"
+    path.write_text(
+        "Header\n\nFEDERALIST No. 1\n\nTitle words\n\nHAMILTON\n\n"
+        "To the People of the State of New York:\n\nBody one.\n\nPUBLIUS\n\n1. A footnote.\n\n"
+        "FEDERALIST No. 49\n\nTo the People of the State of New York:\n\nBody two.\n\nPUBLIUS\n"
+    )
+    papers = load_federalist(path)
+    assert [(p.title, p.author, p.words.tolist()) for p in papers] == [
+        ("No. 1", "Hamilton", ["body", "one"]),
+        ("No. 49", "Disputed", ["body", "two"]),
+    ]

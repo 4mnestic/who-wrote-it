@@ -1,10 +1,10 @@
 {
-  "permutation_test": {
+  "word_length_permutation_test": {
     "pseudo_f": 4.044728806806567,
     "p": 0.00017316017316017316,
     "n_permutations": 34650
   },
-  "classifier_null": {
+  "word_length_classifier_null": {
     "chunk_size": 1000,
     "draws": 200,
     "observed": 0.5004589521138896,
