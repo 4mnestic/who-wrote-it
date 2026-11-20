@@ -58,25 +58,6 @@ def leave_one_book_out(books: list[Book], chunk_size: int, fs: FeatureSet) -> di
     }
 
 
-def train_test_books(
-    train: list[Book], test: list[Book], chunk_size: int, fs: FeatureSet,
-    label=lambda b: b.author,
-) -> list[dict]:
-    """Fit on `train` chunks (labeled by `label`) and report, for each test
-    book, the share of its chunks assigned to each class."""
-    feats = _chunks(train, fs, chunk_size)
-    y = np.concatenate([[label(b)] * len(f) for b, f in zip(train, feats)])
-    model = make_model().fit(np.vstack(feats), y)
-    out = []
-    for book, f in zip(test, _chunks(test, fs, chunk_size)):
-        pred = model.predict(f)
-        out.append(
-            {"title": book.title, "features": fs.name, "chunks": len(pred)}
-            | {c: float(np.mean(pred == c)) for c in model.classes_}
-        )
-    return out
-
-
 def paper_level(papers: list[Book], fs: FeatureSet) -> np.ndarray:
     """One row of feature rates per whole document."""
     return np.array([rates(fs.encode(p.words), fs.n_features) for p in papers])

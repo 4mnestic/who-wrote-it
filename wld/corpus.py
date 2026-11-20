@@ -71,10 +71,10 @@ def bin_labels(max_len: int = MAX_LEN) -> list[str]:
     return [str(i) for i in range(1, max_len)] + [f"{max_len}+"]
 
 
-def load_books(subset: str = "main", data_dir: Path = DATA_DIR) -> list[Book]:
-    """Read the manifest and return the books in `subset`, cleaned and tokenized."""
+def load_books(data_dir: Path = DATA_DIR) -> list[Book]:
+    """Read the manifest and return every book, cleaned and tokenized."""
     with open(data_dir / "books.csv", newline="", encoding="utf-8") as f:
-        rows = [r for r in csv.DictReader(f) if r["set"] == subset]
+        rows = list(csv.DictReader(f))
     books = []
     for r in rows:
         raw = (data_dir / "texts" / r["file"]).read_text(encoding="utf-8-sig")

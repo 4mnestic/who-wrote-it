@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import matplotlib
@@ -12,37 +11,20 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from .classify import (  # noqa: E402
-    leave_one_book_out,
-    leave_one_out_documents,
-    predict_documents,
-    train_test_books,
-)
+from .classify import leave_one_book_out, leave_one_out_documents, predict_documents  # noqa: E402
 from .corpus import Book, bin_counts, bin_labels, load_books, load_federalist  # noqa: E402
 from .features import FUNCTION_WORD, WORD_LENGTH  # noqa: E402
-from .stats import exact_permutation_test, hellinger, homogeneity_test  # noqa: E402
+from .stats import homogeneity_test  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 CHUNK_SIZES = [100, 250, 500, 1000, 2500, 5000]
-REF_CHUNK = 1000  # passage length used for per-book tables and the null test
-NULL_DRAWS, SEED = 200, 0
-MARKER_WORDS = ["upon", "whilst", "while", "enough", "there"]
+REF_CHUNK = 1000  # passage length for the per-book table
+MARKER_WORDS = ["upon", "whilst", "while", "enough"]
 
-# Translator check: train on Tolstoy (Maude translations) vs Dostoevsky (Garnett
-# translations), then test the crossed cases. Only translators named in the files.
-TRANSLATOR_TRAIN = ["Resurrection", "Master and Man", "Crime and Punishment",
-                    "The Brothers Karamazov", "The Possessed"]
-TRANSLATOR_TEST = ["Anna Karenina", "The Idiot"]
-
-# Validated categorical slots 1-3 (all-pairs safe), assigned to authors in sorted order.
+# Validated categorical slots 1-3 (all-pairs safe); grey marks the baseline signal.
 PALETTE = ["#2a78d6", "#eb6834", "#1baf7a"]
 INK, INK_2, GRID, SURFACE, BASELINE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb", "#9a9893"
 FEATURE_COLORS = {FUNCTION_WORD.name: PALETTE[0], WORD_LENGTH.name: BASELINE}
-
-
-def colors(authors) -> dict[str, str]:
-    """Fixed color per author: same author, same color in every figure."""
-    return dict(zip(sorted(authors), PALETTE))
 
 
 def author_table(books: list[Book]) -> tuple[list[str], np.ndarray]:
@@ -62,18 +44,6 @@ def tests(books: list[Book]) -> pd.DataFrame:
         t = np.array([bin_counts(b.lengths) for b in books if b.author == a])
         rows.append({"comparison": f"Among {a}'s books", **homogeneity_test(t)})
     return pd.DataFrame(rows)
-
-
-def classifier_null(books: list[Book], rng: np.random.Generator) -> np.ndarray:
-    """Word-length balanced accuracy when author labels are shuffled across
-    whole books (group sizes kept): what book-to-book variation alone yields."""
-    labels = np.array([b.author for b in books])
-    out = []
-    for _ in range(NULL_DRAWS):
-        fake = [Book(b.title, a, b.translator, b.words)
-                for b, a in zip(books, rng.permutation(labels))]
-        out.append(leave_one_book_out(fake, REF_CHUNK, WORD_LENGTH)["balanced_accuracy"])
-    return np.array(out)
 
 
 def marker_rates(papers: list[Book]) -> pd.DataFrame:
@@ -157,31 +127,14 @@ def fig_federalist(disputed: pd.DataFrame, path):
     _save(fig, path)
 
 
-def fig_upon(papers: list[Book], path):
-    """'upon' per 1,000 words in every paper, by attribution group."""
-    groups = ["Hamilton", "Madison", "Disputed"]
-    col = {"Hamilton": PALETTE[1], "Madison": PALETTE[0], "Disputed": BASELINE}
-    fig, ax = plt.subplots(figsize=(8, 3.4), facecolor=SURFACE)
-    _style(ax, grid="x")
-    rng = np.random.default_rng(SEED)
-    for i, g in enumerate(groups):
-        r = [1000 * (p.words == "upon").sum() / len(p.words) for p in papers if p.author == g]
-        ax.plot(r, len(groups) - 1 - i + rng.uniform(-0.15, 0.15, len(r)), "o", ms=7,
-                color=col[g], mec=SURFACE, mew=1, alpha=0.9)
-    ax.set_yticks(range(len(groups)), groups[::-1], color=INK)
-    ax.set_xlabel("Uses of \"upon\" per 1,000 words (one dot per paper)", color=INK)
-    ax.set_title("Hamilton writes \"upon\"; Madison almost never does", color=INK, loc="left")
-    _save(fig, path)
-
-
 def fig_distributions(authors, table, path):
     """Share of words at each length, one line per author."""
     fig, ax = plt.subplots(figsize=(8, 4.5), facecolor=SURFACE)
     _style(ax)
     x = np.arange(table.shape[1])
     props = table / table.sum(axis=1, keepdims=True)
-    for a, p in zip(authors, props):
-        ax.plot(x, p * 100, color=colors(authors)[a], lw=2, marker="o", ms=4, label=a)
+    for a, p, c in zip(authors, props, PALETTE):
+        ax.plot(x, p * 100, color=c, lw=2, marker="o", ms=4, label=a)
     ax.set_xticks(x, bin_labels())
     ax.set_xlabel("Word length (letters)", color=INK)
     ax.set_ylabel("Share of words (%)", color=INK)
@@ -190,34 +143,14 @@ def fig_distributions(authors, table, path):
     _save(fig, path)
 
 
-def fig_mean_length(books, path):
-    """Mean word length of every book, grouped by author."""
-    fig, ax = plt.subplots(figsize=(8, 5), facecolor=SURFACE)
-    _style(ax, grid="x")
-    order = sorted(books, key=lambda b: (b.author, b.lengths.mean()), reverse=True)
-    palette = colors({b.author for b in books})
-    for i, b in enumerate(order):
-        ax.plot(b.lengths.mean(), i, "o", ms=9, color=palette[b.author], mec=SURFACE,
-                mew=2, label=b.author)
-    ax.set_yticks(range(len(order)), [b.title for b in order], color=INK)
-    handles, labels = ax.get_legend_handles_labels()
-    uniq = dict(zip(labels, handles))
-    ax.legend([uniq[a] for a in sorted(uniq)], sorted(uniq), frameon=False,
-              labelcolor=INK, loc="upper left")
-    ax.set_xlabel("Mean word length (letters)", color=INK)
-    ax.set_title("Books by the same author vary about as much as authors do",
-                 color=INK, loc="left")
-    _save(fig, path)
-
-
 # ---------------------------------------------------------------- pipeline
 
 
-def main(root: Path = ROOT) -> dict:
+def main(root: Path = ROOT) -> None:
     res, figs = root / "results", root / "figures"
     res.mkdir(exist_ok=True)
     figs.mkdir(exist_ok=True)
-    books = load_books("main")
+    books = load_books()
 
     # 1. Novels: which signal identifies the author, and how much text it needs.
     runs = [leave_one_book_out(books, c, fs)
@@ -229,20 +162,12 @@ def main(root: Path = ROOT) -> dict:
                   if r["chunk_size"] == REF_CHUNK for p in r["per_book"]]).round(4).to_csv(
         res / f"per_book_{REF_CHUNK}_words.csv", index=False)
 
-    # 2. Novels: word length in detail (distributions, effect sizes, tests).
+    # 2. Novels: word length is "significant" but tiny.
     pd.DataFrame([{"title": b.title, "author": b.author, "translator": b.translator,
                    "words": len(b.words), "mean_word_length": round(b.lengths.mean(), 3)}
                   for b in books]).to_csv(res / "books.csv", index=False)
     authors, table = author_table(books)
-    pd.DataFrame(table / table.sum(axis=1, keepdims=True), index=authors,
-                 columns=bin_labels()).round(5).to_csv(
-        res / "word_length_distributions.csv", index_label="author")
     tests(books).to_csv(res / "chi_square_tests.csv", index=False)
-    perm = exact_permutation_test(hellinger([bin_counts(b.lengths) for b in books]),
-                                  np.array([b.author for b in books]))
-    null = classifier_null(books, np.random.default_rng(SEED))
-    observed = next(r["balanced_accuracy"] for r in runs
-                    if r["features"] == WORD_LENGTH.name and r["chunk_size"] == REF_CHUNK)
 
     # 3. Federalist Papers: validate on known papers, then decide the disputed ones.
     papers = load_federalist()
@@ -263,36 +188,10 @@ def main(root: Path = ROOT) -> dict:
     verdicts.round(4).to_csv(res / "federalist_disputed.csv", index=False)
     marker_rates(papers).to_csv(res / "federalist_marker_words.csv", index=False)
 
-    # 4. Translator check.
-    by_title = {b.title: b for b in books + load_books("translation")}
-    train = [by_title[t] for t in TRANSLATOR_TRAIN]
-    test = [by_title[t] for t in TRANSLATOR_TEST]
-    label = lambda b: f"{b.author} ({b.translator})"  # noqa: E731
-    pd.DataFrame([r | {"test_translator": by_title[r["title"]].translator}
-                  for fs in (FUNCTION_WORD, WORD_LENGTH)
-                  for r in train_test_books(train, test, REF_CHUNK, fs, label)]).round(4).to_csv(
-        res / "translator_check.csv", index=False)
-
-    summary = {
-        "word_length_permutation_test": perm,
-        "word_length_classifier_null": {
-            "chunk_size": REF_CHUNK,
-            "draws": NULL_DRAWS,
-            "observed": observed,
-            "null_median": float(np.median(null)),
-            "null_95th_percentile": float(np.percentile(null, 95)),
-            "p": float((1 + np.sum(null >= observed)) / (1 + len(null))),
-        },
-    }
-    (res / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-
     fig_accuracy(curve, figs / "accuracy_by_passage_length.png")
     fig_federalist(verdicts, figs / "federalist_disputed.png")
-    fig_upon(papers, figs / "federalist_upon.png")
     fig_distributions(authors, table, figs / "word_length_by_author.png")
-    fig_mean_length(books, figs / "mean_length_by_book.png")
-    return summary
 
 
 if __name__ == "__main__":  # pragma: no cover
-    print(json.dumps(main(), indent=2))
+    main()

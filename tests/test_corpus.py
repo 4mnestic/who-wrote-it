@@ -69,17 +69,15 @@ def test_bin_labels_match_bins():
     assert len(bin_labels()) == len(bin_counts(np.array([1])))
 
 
-def test_load_books_filters_by_set(tmp_path):
-    """Only manifest rows in the requested set are loaded, cleaned and tokenized."""
+def test_load_books_reads_manifest(tmp_path):
+    """Books listed in the manifest are loaded, cleaned and tokenized."""
     (tmp_path / "texts").mkdir()
     (tmp_path / "texts" / "a.txt").write_text("junk Start of tale. The End junk")
-    (tmp_path / "texts" / "b.txt").write_text("Start x The End")
     (tmp_path / "books.csv").write_text(
-        "file,title,author,translator,published,set,start,end\n"
-        "a.txt,Tale,Someone,,1900,main,Start,The End\n"
-        "b.txt,Other,Else,,1900,translation,Start,The End\n"
+        "file,title,author,translator,published,start,end\n"
+        "a.txt,Tale,Someone,,1900,Start,The End\n"
     )
-    (book,) = load_books("main", tmp_path)
+    (book,) = load_books(tmp_path)
     assert (book.title, book.author) == ("Tale", "Someone")
     assert book.words.tolist() == ["start", "of", "tale", "the", "end"]
 
