@@ -117,11 +117,16 @@ def fig_federalist(disputed: pd.DataFrame, path):
         ax.plot(disputed[col] * 100, y, "o", ms=9, color=FEATURE_COLORS[name],
                 mec=SURFACE, mew=1.5, label=name)
     ax.axvline(50, color=INK_2, lw=1, ls="--")
+    close = disputed.p_madison_function_words.sub(0.5).abs().idxmin()
+    ax.annotate("too close to call", (disputed.p_madison_function_words[close] * 100, y[close]),
+                xytext=(-10, 0), textcoords="offset points", va="center", ha="right", fontsize=9,
+                color=FEATURE_COLORS[FUNCTION_WORD.name])
     ax.set_yticks(y, disputed.paper, color=INK)
     ax.set_xlim(-2, 102)
     ax.set_xticks([0, 25, 50, 75, 100], ["0%\nHamilton", "25%", "50%", "75%", "100%\nMadison"])
     ax.set_xlabel("Model's probability that Madison wrote it", color=INK)
-    ax.set_title("The 12 disputed Federalist Papers", color=INK, loc="left")
+    ax.set_title("Function words give 11 of 12 disputed papers to Madison; word length scatters",
+                 color=INK, loc="left", fontsize=11)
     ax.legend(frameon=False, labelcolor=INK, loc="upper center", ncol=2,
               bbox_to_anchor=(0.5, -0.22))
     _save(fig, path)
@@ -152,7 +157,7 @@ def main(root: Path = ROOT) -> None:
     figs.mkdir(exist_ok=True)
     books = load_books()
 
-    # 1. Novels: which signal identifies the author, and how much text it needs.
+    # Stage 1 (novels): which signal identifies the author, and how much text it needs.
     runs = [leave_one_book_out(books, c, fs)
             for fs in (FUNCTION_WORD, WORD_LENGTH) for c in CHUNK_SIZES]
     curve = pd.DataFrame([{k: r[k] for k in ("features", "chunk_size", "balanced_accuracy",
@@ -162,14 +167,14 @@ def main(root: Path = ROOT) -> None:
                   if r["chunk_size"] == REF_CHUNK for p in r["per_book"]]).round(4).to_csv(
         res / f"per_book_{REF_CHUNK}_words.csv", index=False)
 
-    # 2. Novels: word length is "significant" but tiny.
+    # Stage 1 (novels): word length is "significant" but tiny.
     pd.DataFrame([{"title": b.title, "author": b.author, "translator": b.translator,
                    "words": len(b.words), "mean_word_length": round(b.lengths.mean(), 3)}
                   for b in books]).to_csv(res / "books.csv", index=False)
     authors, table = author_table(books)
     tests(books).to_csv(res / "chi_square_tests.csv", index=False)
 
-    # 3. Federalist Papers: validate on known papers, then decide the disputed ones.
+    # Stage 2 (Federalist Papers): validate on known papers, then decide the disputed ones.
     papers = load_federalist()
     known = [p for p in papers if p.author in ("Hamilton", "Madison")]
     disputed = [p for p in papers if p.author == "Disputed"]
