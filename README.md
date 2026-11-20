@@ -1,6 +1,6 @@
 # Who wrote it? Identifying authors from their writing habits
 
-[![tests](https://github.com/4mnestic/word-length-distribution-goodness-of-fit/actions/workflows/ci.yml/badge.svg)](https://github.com/4mnestic/word-length-distribution-goodness-of-fit/actions/workflows/ci.yml)
+[![tests](https://github.com/4mnestic/who-wrote-it/actions/workflows/ci.yml/badge.svg)](https://github.com/4mnestic/who-wrote-it/actions/workflows/ci.yml)
 
 In 1887, T. C. Mendenhall claimed every writer has a telltale pattern of word lengths. I tested
 that claim in two stages, the way a model is built and then put to use:
