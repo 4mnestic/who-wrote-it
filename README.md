@@ -150,6 +150,11 @@ wld/analysis.py         runs everything, writes results/ and figures/
 tests/                  unit and end-to-end tests (100% line coverage)
 ```
 
+## Background
+
+This project began as a term paper for LING 388, which I later extended with
+[Claude](https://claude.ai).
+
 ## Reference
 
 Mendenhall, T. C. (1887). The characteristic curves of composition. *Science*, 9(214),
