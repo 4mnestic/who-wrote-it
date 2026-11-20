@@ -125,24 +125,6 @@ books get the right author. The two misses are *Great Expectations* (labeled Aus
 - **Word length is a single, coarse feature.** Modern authorship attribution relies on
   function-word frequencies and character n-grams, which carry far more signal.
 
-## What changed from the 2024 version
-
-This started as a 2024 term project ([original paper and code](archive/2024/)). On review,
-its conclusions did not hold up:
-
-| 2024 issue | Effect | Fix |
-|---|---|---|
-| Word-length bins were in first-seen order (`[wld.get(k) for k in wld.keys()]`), so Austen's first bin was 11-letter words while Dickens's was 7-letter words | The chi-square compared counts of *different* word lengths, inflating chi-square to 245,000–685,000 (rerun and paper) | Bins indexed by length, with a regression test (`tests/test_corpus.py`) |
-| Punctuation tokens were counted as 1-letter words (19–22% of all "words") | The length-1 bin was mostly commas and periods | Letters-only tokenizer |
-| Prefaces left in place (e.g. George Saintsbury's 1894 preface to *Pride and Prejudice*, Dickens's preface to *Nickleby*) | Non-author text counted as the author's | Start/end markers in the manifest, applied in code |
-| Each author was tested against a pooled average that included themselves, using a goodness-of-fit test | Wrong degrees of freedom; not a test of whether groups differ | Chi-square test of homogeneity on the full table |
-| "p = 0.0, so authors differ" | With millions of words, significance is guaranteed and says nothing about size | Effect sizes, a book-level permutation test, and an out-of-sample classifier |
-| Results depended on `os.listdir` order, and plots blocked the script | Not reproducible: rerunning the 2024 code does not give the paper's numbers | Deterministic pipeline, one command, saved outputs |
-
-The 2024 conclusion was that authors couldn't be distinguished because "even books by the
-same author come from different distributions." The corrected analysis finds a small but
-real author signal that becomes useful only with long passages.
-
 ## Reproduce it
 
 Requires [uv](https://docs.astral.sh/uv/) (it installs Python and the locked dependencies).
@@ -166,7 +148,6 @@ wld/stats.py            chi-square + Cramér's V, exact permutation test
 wld/classify.py         passage features, leave-one-book-out classifier
 wld/analysis.py         runs everything, writes results/ and figures/
 tests/                  unit and end-to-end tests (100% line coverage)
-archive/2024/           original term paper and code, kept for reference
 ```
 
 ## Reference

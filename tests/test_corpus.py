@@ -32,7 +32,7 @@ def test_clean_raises_when_markers_missing():
 
 
 def test_word_lengths_ignore_punctuation_and_digits():
-    """Punctuation and numbers are not words; the original code counted ',' as a 1-letter word."""
+    """Punctuation and numbers are not words, so ',' is never a 1-letter word."""
     assert word_lengths("Hello, world! 1887 -- ok.").tolist() == [5, 5, 2]
 
 
@@ -42,8 +42,7 @@ def test_word_lengths_contractions_and_accents():
 
 
 def test_bin_counts_are_aligned_by_length():
-    """Bin i always means length i+1, regardless of the order words appear in
-    (regression test for the original first-seen-order bug)."""
+    """Bin i always means length i+1, regardless of the order words appear in."""
     a = bin_counts(np.array([3, 1, 2]), max_len=4)
     b = bin_counts(np.array([1, 2, 3]), max_len=4)
     assert a.tolist() == b.tolist() == [1, 1, 1, 0]
