@@ -9,19 +9,18 @@ better, and used it on the disputed Federalist Papers.
 ## Results
 
 - **Word length doesn't identify authors.** On 1,000-word passages it picks the right author
-  50% of the time, against 33% for a random guess. A [chi-square test](wld/stats.py#L9)
-  (SciPy) calls the differences between authors significant, but the effect size (Cramér's
-  V = 0.04) is [no bigger](METHODS.md#word-length-significant-but-tiny) than the
-  differences among one author's own books. With millions of words, "significant" doesn't
-  mean "useful."
-- **Function words do.** I [engineered features](wld/features.py#L48) from how often a
-  writer uses 70 common words (*the, upon, would, whilst*…) and fed them to a scikit-learn
-  [logistic regression](wld/classify.py#L15). Accuracy is 90% at 1,000 words and 99% at
-  5,000. All 12 novels are attributed correctly.
-- **The Federalist Papers.** After correctly attributing 64 of 65 papers of known authorship,
-  the model [assigns probabilities](wld/classify.py#L87) to the 12 disputed papers: 11 go to
-  Madison with at least 93% confidence, matching the historical consensus. No. 55 is too
-  close to call.
+  50% of the time, against 33% for a random guess. A chi-square test (SciPy) says the
+  authors' word-length distributions differ significantly, but the effect size (Cramér's
+  V = 0.04) is no bigger than the differences among one author's own books. With millions
+  of words, "significant" doesn't mean "useful."
+- **Function words do.** I cut each book into passages and turned each passage into 70
+  numbers: how often it uses each of 70 common words (*the, upon, would, whilst*…). A
+  logistic regression (scikit-learn) trained on those numbers names the right author 90% of
+  the time at 1,000 words and 99% at 5,000, and attributes all 12 novels correctly.
+- **The Federalist Papers.** The same model, after correctly attributing 64 of 65 papers of
+  known authorship, gives each disputed paper a probability of being Madison's. 11 of the 12
+  come out at least 93% Madison, matching the historical consensus. No. 55 is too close to
+  call.
 
 ![Accuracy by passage length](figures/accuracy_by_passage_length.png)
 
@@ -38,20 +37,20 @@ The clearest single clue is *upon*. Hamilton uses it 3.3 times per 1,000 words, 
 
 ## How it was tested
 
-- **No data leakage.** Every score comes from text the model never saw. For the novels,
-  I [train on 11 books and test on the 12th](wld/classify.py#L26), rotating through all 12;
-  for the Federalist Papers, I [hold out one paper at a time](wld/classify.py#L66).
-  Splitting randomly would let the model recognize a book's characters instead of its
-  author's style.
+- **No data leakage.** Every score comes from text the model never saw. For the novels, the
+  model trains on 11 books and is tested on the 12th, rotating through all 12. For the
+  Federalist Papers, it holds out one paper at a time. A random split would let the model
+  recognize a book's characters instead of its author's style.
 - **Class imbalance handled.** Hamilton wrote 51 of the 65 known papers, so always guessing
-  "Hamilton" would be right 78% of the time. Classes are weighted equally and scored with
-  [balanced accuracy](wld/classify.py#L53), which that trick can't fool.
-- **Cleaning done in code, not by hand.** A [manifest](data/books.csv) records where each
-  narrative starts and ends; [`clean`](wld/corpus.py#L47) removes editors' prefaces,
-  illustration captions and chapter headings with regular expressions, and NumPy turns the
-  text into features.
+  "Hamilton" would be right 78% of the time. The model weights both authors equally, and
+  results are reported as balanced accuracy (the average of each author's hit rate), which
+  that trick can't inflate.
+- **Cleaning done in code, not by hand.** A small table records where each novel's story
+  starts and ends. The code keeps only that span and uses regular expressions to strip
+  editors' prefaces, illustration captions and chapter headings, so the cleaning is
+  repeatable.
 
-Full tables are in [METHODS.md](METHODS.md).
+Full tables are in [METHODS.md](METHODS.md); code is in [`wld/`](wld/).
 
 ## Limitations
 
@@ -63,8 +62,8 @@ Full tables are in [METHODS.md](METHODS.md).
 ## Reproduce
 
 One command rebuilds every table (pandas) and chart (matplotlib) from the raw texts.
-Dependencies are locked with uv, and the [pytest suite](tests/) runs on every push via
-GitHub Actions.
+Dependencies are locked with uv, and automated tests (pytest) check the cleaning, features
+and statistics on every push via GitHub Actions.
 
 ```bash
 uv sync
