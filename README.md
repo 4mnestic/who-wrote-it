@@ -4,7 +4,7 @@
 
 In 1887, T. C. Mendenhall claimed every writer has a telltale pattern of word lengths. I tested
 that on 2.4 million words from Austen, Dickens and Tolstoy, found a signal that works far
-better, and used it on the disputed Federalist Papers.
+better (function words), and used it on the disputed Federalist Papers.
 
 ## Results
 
@@ -16,7 +16,7 @@ better, and used it on the disputed Federalist Papers.
   differences significant, but the effect size (Cramér's V = 0.04) is no bigger than the
   gap between one author's own books. With 2.4 million words almost anything is
   "significant"; size is what matters.
-- **Function words do.** I swapped in how often each passage uses 70 common words (*the,
+- **Function words identify authors.** I swapped in how often each passage uses 70 common words (*the,
   upon, would, whilst*…). They appear whatever the topic, so they reflect habit rather than
   plot. With the same model and the same test, accuracy reaches 90% at 1,000 words and 99%
   at 5,000, and all 12 novels are attributed correctly. Keeping the model fixed means the
