@@ -1,0 +1,29 @@
+[project]
+name = "wld"
+version = "2.0.0"
+description = "Do authors have a word-length fingerprint? A statistical re-analysis of Mendenhall (1887)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scikit-learn>=1.4",
+    "scipy>=1.11",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+]
+
+[tool.setuptools]
+packages = ["wld"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = "--cov=wld --cov-report=term-missing"

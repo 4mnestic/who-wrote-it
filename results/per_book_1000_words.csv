@@ -1,0 +1,25 @@
+title,author,chunks,chunk_accuracy,majority_vote,features
+Emma,Austen,160,0.9562,Austen,Function words
+Persuasion,Austen,83,0.9277,Austen,Function words
+Pride and Prejudice,Austen,122,0.8279,Austen,Function words
+Sense and Sensibility,Austen,119,0.9748,Austen,Function words
+Great Expectations,Dickens,186,0.9194,Dickens,Function words
+Nicholas Nickleby,Dickens,324,0.9383,Dickens,Function words
+Oliver Twist,Dickens,158,0.9367,Dickens,Function words
+A Tale of Two Cities,Dickens,137,0.7299,Dickens,Function words
+Anna Karenina,Tolstoy,351,0.8462,Tolstoy,Function words
+Master and Man,Tolstoy,19,1.0,Tolstoy,Function words
+Resurrection,Tolstoy,173,0.9364,Tolstoy,Function words
+War and Peace,Tolstoy,564,0.8706,Tolstoy,Function words
+Emma,Austen,160,0.5812,Austen,Word length
+Persuasion,Austen,83,0.5783,Austen,Word length
+Pride and Prejudice,Austen,122,0.8443,Austen,Word length
+Sense and Sensibility,Austen,119,0.4286,Austen,Word length
+Great Expectations,Dickens,186,0.3925,Austen,Word length
+Nicholas Nickleby,Dickens,324,0.4444,Dickens,Word length
+Oliver Twist,Dickens,158,0.4304,Dickens,Word length
+A Tale of Two Cities,Dickens,137,0.4161,Dickens,Word length
+Anna Karenina,Tolstoy,351,0.5043,Tolstoy,Word length
+Master and Man,Tolstoy,19,0.8421,Tolstoy,Word length
+Resurrection,Tolstoy,173,0.5549,Tolstoy,Word length
+War and Peace,Tolstoy,564,0.4043,Dickens,Word length
