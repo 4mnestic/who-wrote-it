@@ -1,0 +1,15 @@
+{
+  "permutation_test": {
+    "pseudo_f": 4.044728806806567,
+    "p": 0.00017316017316017316,
+    "n_permutations": 34650
+  },
+  "classifier_null": {
+    "chunk_size": 1000,
+    "draws": 200,
+    "observed": 0.5004589521138896,
+    "null_median": 0.31406042806742773,
+    "null_95th_percentile": 0.42822867618381594,
+    "p": 0.009950248756218905
+  }
+}
